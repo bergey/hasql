@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-|
 A DSL for declaration of result decoders.
 -}
@@ -118,8 +119,8 @@ Lift an individual non-nullable value decoder to a composable row decoder.
 {-# INLINABLE column #-}
 column :: NullableOrNot Value a -> Row a
 column = \ case
-  NonNullable (Value imp) -> Row (Row.nonNullValue imp)
-  Nullable (Value imp) -> Row (Row.value imp)
+  NonNullable (Value typeName imp) -> Row (Row.nonNullValue typeName imp)
+  Nullable (Value typeName imp) -> Row (Row.value typeName imp)
 
 
 -- * Nullability
@@ -151,7 +152,7 @@ nullable = Nullable
 {-|
 Decoder of a value.
 -}
-newtype Value a = Value (Value.Value a)
+data Value a = Value !ByteString !(Value.Value a)
   deriving (Functor)
 
 {-|
@@ -159,21 +160,21 @@ Decoder of the @BOOL@ values.
 -}
 {-# INLINABLE bool #-}
 bool :: Value Bool
-bool = Value (Value.decoder (const A.bool))
+bool = Value "bool" (Value.decoder (const A.bool))
 
 {-|
 Decoder of the @INT2@ values.
 -}
 {-# INLINABLE int2 #-}
 int2 :: Value Int16
-int2 = Value (Value.decoder (const A.int))
+int2 = Value "int2" (Value.decoder (const A.int))
 
 {-|
 Decoder of the @INT4@ values.
 -}
 {-# INLINABLE int4 #-}
 int4 :: Value Int32
-int4 = Value (Value.decoder (const A.int))
+int4 = Value "int4" (Value.decoder (const A.int))
 
 {-|
 Decoder of the @INT8@ values.
@@ -181,28 +182,28 @@ Decoder of the @INT8@ values.
 {-# INLINABLE int8 #-}
 int8 :: Value Int64
 int8 = {-# SCC "int8" #-}
-  Value (Value.decoder (const ({-# SCC "int8.int" #-} A.int)))
+  Value "int8" (Value.decoder (const ({-# SCC "int8.int" #-} A.int)))
 
 {-|
 Decoder of the @FLOAT4@ values.
 -}
 {-# INLINABLE float4 #-}
 float4 :: Value Float
-float4 = Value (Value.decoder (const A.float4))
+float4 = Value "float4" (Value.decoder (const A.float4))
 
 {-|
 Decoder of the @FLOAT8@ values.
 -}
 {-# INLINABLE float8 #-}
 float8 :: Value Double
-float8 = Value (Value.decoder (const A.float8))
+float8 = Value "float8" (Value.decoder (const A.float8))
 
 {-|
 Decoder of the @NUMERIC@ values.
 -}
 {-# INLINABLE numeric #-}
 numeric :: Value B.Scientific
-numeric = Value (Value.decoder (const A.numeric))
+numeric = Value "numeric" (Value.decoder (const A.numeric))
 
 {-|
 Decoder of the @CHAR@ values.
@@ -210,35 +211,35 @@ Note that it supports Unicode values.
 -}
 {-# INLINABLE char #-}
 char :: Value Char
-char = Value (Value.decoder (const A.char))
+char = Value "char" (Value.decoder (const A.char))
 
 {-|
 Decoder of the @TEXT@ values.
 -}
 {-# INLINABLE text #-}
 text :: Value Text
-text = Value (Value.decoder (const A.text_strict))
+text = Value "text" (Value.decoder (const A.text_strict))
 
 {-|
 Decoder of the @BYTEA@ values.
 -}
 {-# INLINABLE bytea #-}
 bytea :: Value ByteString
-bytea = Value (Value.decoder (const A.bytea_strict))
+bytea = Value "bytea" (Value.decoder (const A.bytea_strict))
 
 {-|
 Decoder of the @DATE@ values.
 -}
 {-# INLINABLE date #-}
 date :: Value B.Day
-date = Value (Value.decoder (const A.date))
+date = Value "date" (Value.decoder (const A.date))
 
 {-|
 Decoder of the @TIMESTAMP@ values.
 -}
 {-# INLINABLE timestamp #-}
 timestamp :: Value B.LocalTime
-timestamp = Value (Value.decoder (Prelude.bool A.timestamp_float A.timestamp_int))
+timestamp = Value "timestamp" (Value.decoder (Prelude.bool A.timestamp_float A.timestamp_int))
 
 {-|
 Decoder of the @TIMESTAMPTZ@ values.
@@ -253,19 +254,19 @@ and communicates with Postgres using the UTC values directly.
 -}
 {-# INLINABLE timestamptz #-}
 timestamptz :: Value B.UTCTime
-timestamptz = Value (Value.decoder (Prelude.bool A.timestamptz_float A.timestamptz_int))
+timestamptz = Value "timestamptz" (Value.decoder (Prelude.bool A.timestamptz_float A.timestamptz_int))
 
 {-|
 Decoder of the @TIME@ values.
 -}
 {-# INLINABLE time #-}
 time :: Value B.TimeOfDay
-time = Value (Value.decoder (Prelude.bool A.time_float A.time_int))
+time = Value "time" (Value.decoder (Prelude.bool A.time_float A.time_int))
 
 {-|
 Decoder of the @TIMETZ@ values.
 
-Unlike in case of @TIMESTAMPTZ@, 
+Unlike in case of @TIMESTAMPTZ@,
 Postgres does store the timezone information for @TIMETZ@.
 However the Haskell's \"time\" library does not contain any composite type,
 that fits the task, so we use a pair of 'TimeOfDay' and 'TimeZone'
@@ -273,63 +274,63 @@ to represent a value on the Haskell's side.
 -}
 {-# INLINABLE timetz #-}
 timetz :: Value (B.TimeOfDay, B.TimeZone)
-timetz = Value (Value.decoder (Prelude.bool A.timetz_float A.timetz_int))
+timetz = Value "timetz" (Value.decoder (Prelude.bool A.timetz_float A.timetz_int))
 
 {-|
 Decoder of the @INTERVAL@ values.
 -}
 {-# INLINABLE interval #-}
 interval :: Value B.DiffTime
-interval = Value (Value.decoder (Prelude.bool A.interval_float A.interval_int))
+interval = Value "interval" (Value.decoder (Prelude.bool A.interval_float A.interval_int))
 
 {-|
 Decoder of the @UUID@ values.
 -}
 {-# INLINABLE uuid #-}
 uuid :: Value B.UUID
-uuid = Value (Value.decoder (const A.uuid))
+uuid = Value "uuid" (Value.decoder (const A.uuid))
 
 {-|
 Decoder of the @INET@ values.
 -}
 {-# INLINABLE inet #-}
 inet :: Value (B.NetAddr B.IP)
-inet = Value (Value.decoder (const A.inet))
+inet = Value "inet" (Value.decoder (const A.inet))
 
 {-|
 Decoder of the @JSON@ values into a JSON AST.
 -}
 {-# INLINABLE json #-}
 json :: Value B.Value
-json = Value (Value.decoder (const A.json_ast))
+json = Value "json" (Value.decoder (const A.json_ast))
 
 {-|
 Decoder of the @JSON@ values into a raw JSON 'ByteString'.
 -}
 {-# INLINABLE jsonBytes #-}
 jsonBytes :: (ByteString -> Either Text a) -> Value a
-jsonBytes fn = Value (Value.decoder (const (A.json_bytes fn)))
+jsonBytes fn = Value "json" (Value.decoder (const (A.json_bytes fn)))
 
 {-|
 Decoder of the @JSONB@ values into a JSON AST.
 -}
 {-# INLINABLE jsonb #-}
 jsonb :: Value B.Value
-jsonb = Value (Value.decoder (const A.jsonb_ast))
+jsonb = Value "jsonb" (Value.decoder (const A.jsonb_ast))
 
 {-|
 Decoder of the @JSONB@ values into a raw JSON 'ByteString'.
 -}
 {-# INLINABLE jsonbBytes #-}
 jsonbBytes :: (ByteString -> Either Text a) -> Value a
-jsonbBytes fn = Value (Value.decoder (const (A.jsonb_bytes fn)))
+jsonbBytes fn = Value "jsonb" (Value.decoder (const (A.jsonb_bytes fn)))
 
 {-|
 Lift a custom value decoder function to a 'Value' decoder.
 -}
 {-# INLINABLE custom #-}
-custom :: (Bool -> ByteString -> Either Text a) -> Value a
-custom fn = Value (Value.decoderFn fn)
+custom :: ByteString -> (Bool -> ByteString -> Either Text a) -> Value a
+custom typeName fn = Value typeName (Value.decoderFn fn)
 
 {-|
 A generic decoder of @HSTORE@ values.

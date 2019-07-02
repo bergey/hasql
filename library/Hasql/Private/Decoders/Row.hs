@@ -7,9 +7,16 @@ import qualified PostgreSQL.Binary.Decoding as A
 import qualified Hasql.Private.Decoders.Value as Value
 
 
-newtype Row a =
-  Row (ReaderT Env (ExceptT RowError IO) a)
-  deriving (Functor, Applicative, Monad)
+data Row a =
+  Row ![ByteString] !(ReaderT Env (ExceptT RowError IO) a)
+  deriving (Functor)
+
+instance Applicative Row where
+    pure = Row [] . pure
+    Row ft f <*> Row bt b = Row (ft <> bt) (f b)
+
+instance Monad Row where
+    Row at a >>= f = let Row bt b = f a in Row (at <> bt) b
 
 data Env =
   Env !LibPQ.Result !LibPQ.Row !LibPQ.Column !Bool !(IORef LibPQ.Column)
@@ -35,14 +42,14 @@ error x =
 {-# INLINE value #-}
 value :: Value.Value a -> Row (Maybe a)
 value valueDec =
-  {-# SCC "value" #-} 
+  {-# SCC "value" #-}
   Row $ ReaderT $ \(Env result row columnsAmount integerDatetimes columnRef) -> ExceptT $ do
     col <- readIORef columnRef
     writeIORef columnRef (succ col)
     if col < columnsAmount
       then do
         valueMaybe <- {-# SCC "getvalue'" #-} LibPQ.getvalue' result row col
-        pure $ 
+        pure $
           case valueMaybe of
             Nothing ->
               Right Nothing
@@ -56,5 +63,5 @@ value valueDec =
 {-# INLINE nonNullValue #-}
 nonNullValue :: Value.Value a -> Row a
 nonNullValue valueDec =
-  {-# SCC "nonNullValue" #-} 
+  {-# SCC "nonNullValue" #-}
   value valueDec >>= maybe (error UnexpectedNull) pure
